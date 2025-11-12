@@ -1,0 +1,66 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:doctype_name",
+ "creation": "2025-11-12 10:57:58.067295",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "doctype_name",
+  "table_name",
+  "table_created",
+  "data_migrated"
+ ],
+ "fields": [
+  {
+   "fieldname": "doctype_name",
+   "fieldtype": "Data",
+   "label": "doctype_name",
+   "unique": 1
+  },
+  {
+   "fieldname": "table_name",
+   "fieldtype": "Data",
+   "label": "table_name"
+  },
+  {
+   "default": "0",
+   "fieldname": "table_created",
+   "fieldtype": "Check",
+   "label": "Table Created"
+  },
+  {
+   "default": "0",
+   "fieldname": "data_migrated",
+   "fieldtype": "Check",
+   "label": "Data Migrated"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2025-11-12 11:03:20.385670",
+ "modified_by": "Administrator",
+ "module": "SAP Migration",
+ "name": "Database Table Migration Log",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

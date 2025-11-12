@@ -1,0 +1,79 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-11-05 11:46:53.215224",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "mssql_connection_details_section",
+  "server_name",
+  "username",
+  "column_break_fgyy",
+  "database_name",
+  "password"
+ ],
+ "fields": [
+  {
+   "fieldname": "mssql_connection_details_section",
+   "fieldtype": "Section Break",
+   "label": "MSSQL Connection Details"
+  },
+  {
+   "fieldname": "server_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Server Name",
+   "reqd": 1
+  },
+  {
+   "fieldname": "username",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Username",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_fgyy",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "database_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Database Name",
+   "reqd": 1
+  },
+  {
+   "fieldname": "password",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Password",
+   "reqd": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2025-11-05 11:56:25.114019",
+ "modified_by": "Administrator",
+ "module": "SAP Migration",
+ "name": "SAP Integration",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
