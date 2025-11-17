@@ -2,7 +2,7 @@ import frappe
 import pyodbc
 
 # --- Connection Settings ---
-SERVER   = '192.168.1.1'      # or 'localhost'
+SERVER   = '192.168.12.1'      # or 'localhost'
 DATABASE = 'MPR'
 USERNAME = 'sa'
 PASSWORD = 'qwedsa'

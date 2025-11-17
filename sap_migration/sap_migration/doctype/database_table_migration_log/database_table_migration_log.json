@@ -9,7 +9,8 @@
   "doctype_name",
   "table_name",
   "table_created",
-  "data_migrated"
+  "data_migrated",
+  "no_columns"
  ],
  "fields": [
   {
@@ -34,12 +35,18 @@
    "fieldname": "data_migrated",
    "fieldtype": "Check",
    "label": "Data Migrated"
+  },
+  {
+   "default": "0",
+   "fieldname": "no_columns",
+   "fieldtype": "Check",
+   "label": "No Columns"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-11-12 11:03:20.385670",
+ "modified": "2025-11-15 15:40:01.026296",
  "modified_by": "Administrator",
  "module": "SAP Migration",
  "name": "Database Table Migration Log",
