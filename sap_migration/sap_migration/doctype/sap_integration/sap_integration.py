@@ -231,6 +231,16 @@ def create_doctype(doctype_name: str, columns: list, table_name: str):
 				"fieldname": "process1",
 				"length": length
 			})
+		elif col.get('COLUMN_NAME').lower() == "field_order":
+			length = None
+			if col.get('CHARACTER_MAXIMUM_LENGTH'):
+				length = cint(col.get('CHARACTER_MAXIMUM_LENGTH')) + 1
+			doctype_fields.append({
+				"label": col.get('COLUMN_NAME'),
+				"fieldtype": fieldtype,
+				"fieldname": "field_order1",
+				"length": length
+			})
 		elif fieldtype == "Data" and col.get('CHARACTER_MAXIMUM_LENGTH'):
 			doctype_fields.append({
 				"label": col.get('COLUMN_NAME'),
@@ -293,16 +303,16 @@ def mssql_table_data_migration(doctype, table_name):
 	columns = get_mssql_table_columns(db, table_name)
 	sync_flag_exists = False
 	for col in columns:
-		if col.get('COLUMN_NAME').lower() == "is_sync":
+		if col.get('COLUMN_NAME').lower() == "erpnext_is_sync":
 			sync_flag_exists = True
 			break
 	if not sync_flag_exists:
 		db.execute("""ALTER TABLE mpr.[{0}]
-			ADD is_sync INT NOT NULL DEFAULT 0;
+			ADD erpnext_is_sync INT NOT NULL DEFAULT 0;
 		""".format(table_name))
 
-		db.execute("""CREATE INDEX idx_{0}_is_sync
-			ON mpr.[{0}] (is_sync);
+		db.execute("""CREATE INDEX idx_{0}_erpnext_is_sync
+			ON mpr.[{0}] (erpnext_is_sync);
 		""".format(table_name))
 
 	primary_key = db.select("""SELECT 
@@ -337,7 +347,7 @@ def get_mssql_data(db, doctype, table_name, primary_key):
 		pk_condition = " AND ".join(f"{col.get('COLUMN_NAME')} = '{{{col.get('COLUMN_NAME')}}}'" for col in primary_key)
 	
 	while True:
-		records = db.select("""SELECT TOP 1000 * FROM mpr.[{0}] WHERE is_sync = 0;""".format(table_name))
+		records = db.select("""SELECT TOP 1000 * FROM mpr.[{0}] WHERE erpnext_is_sync = 0;""".format(table_name))
 		# frappe.log_error(str(records), "Sap migration data table")
 		# stop loop if no rows
 		if not records:
@@ -371,6 +381,8 @@ def create_data_in_frappe(doctype, table_name, pk_condition, records):
 				field_name = "meta1"
 			elif field_name == "process":
 				field_name = "process1"
+			elif field_name == "field_order":
+				field_name = "field_order1"
 			elif field_name in restricted:
 				field_name = field_name + "1"
 			if isinstance(value, (bytes, bytearray)):
@@ -412,14 +424,11 @@ def create_data_in_frappe(doctype, table_name, pk_condition, records):
 		# update sync flag
 		update_sync_flag(db, table_name, pk_condition, record, 1)
 		frappe.db.commit()
-		# db.run("""UPDATE mpr.[{table_name}]
-		# 	SET is_sync = 1
-		# 	WHERE {pk_condition};""",table_name=table_name, pk_condition=pk_condition, record=record
-		# )
+		
 
 def update_sync_flag(db, table_name, pk_condition, record, flag):
 	mssql_query = f"""UPDATE mpr.[{table_name}]
-		SET is_sync = {flag}
+		SET erpnext_is_sync = {flag}
 		WHERE {pk_condition};"""
 	db.execute(mssql_query.format(**record))
 
