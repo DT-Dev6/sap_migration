@@ -44,6 +44,20 @@ MSSQL_TO_FRAPPE_TYPES = {
     "geography": "Data",
 }
 
+restricted = (
+	"name",
+	"parent",
+	"creation",
+	"owner",
+	"modified",
+	"modified_by",
+	"parentfield",
+	"parenttype",
+	"file_list",
+	"flags",
+	"docstatus",
+)
+
 
 class SAPIntegration(Document):
 	@frappe.whitelist()
@@ -81,7 +95,7 @@ def msql_error_table_migration():
 	for table in error_tables:
 		table_name = table.get("table_name")
 		doctype_name = table.get("doctype_name")
-		columns = db.run("""SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH 
+		columns = db.select("""SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH 
 			FROM INFORMATION_SCHEMA.COLUMNS 
 			WHERE TABLE_NAME = '{0}';
 		""".format(table_name))
@@ -97,6 +111,9 @@ def msql_error_table_migration():
 		else:
 			log = frappe.get_doc("Database Table Migration Log", doctype_name)
 			log.no_columns = 1
+			log.flags.ignore_mandatory = True
+			log.flags.ignore_validate = True
+			log.flags.ignore_links = True
 			log.save(ignore_permissions=True)
 			frappe.db.commit()
 
@@ -109,20 +126,25 @@ def msql_error_data_table_migration():
 		},
 		fields=["table_name", "doctype_name"]
 	)
+	
 	for table in error_tables:
-		table_name = table.get("table_name")
-		doctype_name = table.get("doctype_name")
-		frappe.enqueue(
-			mssql_table_data_migration,
-			doctype=doctype_name,
-			table_name= table_name,
-			queue="long",
-			timeout=600000
+		exists_data = frappe.db.get_all(table.get("doctype_name"),
+			fields=["name"]
 		)
+		if not exists_data:
+			table_name = table.get("table_name")
+			doctype_name = table.get("doctype_name")
+			frappe.enqueue(
+				mssql_table_data_migration,
+				doctype=doctype_name,
+				table_name= table_name,
+				queue="long",
+				timeout=600000
+			)
 
 def mssql_table_migration():
 	db = MSSQL()
-	database_tables = db.run("""SELECT *
+	database_tables = db.select("""SELECT *
 			FROM INFORMATION_SCHEMA.TABLES
 			WHERE TABLE_TYPE='BASE TABLE' """)
 	
@@ -131,10 +153,11 @@ def mssql_table_migration():
 		doctype_name = f'{table.get("TABLE_SCHEMA")}-{table.get("TABLE_NAME")}'.replace("-/", "-").replace("/", "-")
 		if frappe.db.exists("DocType", doctype_name):
 			continue
-		columns = db.run("""SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH 
-			FROM INFORMATION_SCHEMA.COLUMNS 
-			WHERE TABLE_NAME = '{0}';
-		""".format(table_name))
+		# columns = db.select("""SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH 
+		# 	FROM INFORMATION_SCHEMA.COLUMNS 
+		# 	WHERE TABLE_NAME = '{0}';
+		# """.format(table_name))
+		columns = get_mssql_table_columns(db, table_name)
 		if not frappe.db.exists("Database Table Migration Log", doctype_name):
 			log = frappe.new_doc("Database Table Migration Log")
 			log.table_name = table_name
@@ -149,6 +172,13 @@ def mssql_table_migration():
 			queue="long",
 			timeout=600000
 		)
+
+def get_mssql_table_columns(db, table_name):
+	columns = db.select("""SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH 
+		FROM INFORMATION_SCHEMA.COLUMNS 
+		WHERE TABLE_NAME = '{0}';
+	""".format(table_name))
+	return columns
 		
 		
 
@@ -235,6 +265,9 @@ def create_doctype(doctype_name: str, columns: list, table_name: str):
 
 	log = frappe.get_doc("Database Table Migration Log", doctype_name)
 	log.table_created = 1
+	log.flags.ignore_mandatory = True
+	log.flags.ignore_validate = True
+	log.flags.ignore_links = True
 	log.save(ignore_permissions=True)
 
 	frappe.db.commit()
@@ -254,70 +287,143 @@ def convert_mssql_to_frappe(dtype: str) -> str:
 
 
 def mssql_table_data_migration(doctype, table_name):
-	restricted = (
-		"name",
-		"parent",
-		"creation",
-		"owner",
-		"modified",
-		"modified_by",
-		"parentfield",
-		"parenttype",
-		"file_list",
-		"flags",
-		"docstatus",
-	)
 	# if not db:
 	db = MSSQL()
-	records = db.run("""SELECT * FROM mpr.[{0}]""".format(table_name))
-	# frappe.log_error(str(records), "Sap migration data table")
+	# create_sync_flag in mssql table
+	columns = get_mssql_table_columns(db, table_name)
+	sync_flag_exists = False
+	for col in columns:
+		if col.get('COLUMN_NAME').lower() == "is_sync":
+			sync_flag_exists = True
+			break
+	if not sync_flag_exists:
+		db.execute("""ALTER TABLE mpr.[{0}]
+			ADD is_sync INT NOT NULL DEFAULT 0;
+		""".format(table_name))
+
+		db.execute("""CREATE INDEX idx_{0}_is_sync
+			ON mpr.[{0}] (is_sync);
+		""".format(table_name))
+
+	primary_key = db.select("""SELECT 
+			KU.TABLE_NAME,
+			KU.COLUMN_NAME,
+			KU.ORDINAL_POSITION
+		FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS AS TC
+		JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE AS KU
+			ON TC.CONSTRAINT_NAME = KU.CONSTRAINT_NAME
+		WHERE TC.TABLE_NAME = '{0}'
+			AND TC.CONSTRAINT_TYPE = 'PRIMARY KEY'
+			AND TC.TABLE_SCHEMA = 'mpr'
+		ORDER BY KU.ORDINAL_POSITION;
+	""".format(table_name))
+
+	if not primary_key:
+		frappe.throw(f"❌ Primary Key not found for table {table_name}")
+
+	get_mssql_data(db, doctype, table_name, primary_key)
+	
+	log = frappe.get_doc("Database Table Migration Log", doctype)
+	log.data_migrated = 1
+	log.flags.ignore_mandatory = True
+	log.flags.ignore_validate = True
+	log.flags.ignore_links = True
+	log.save(ignore_permissions=True)
+
+
+def get_mssql_data(db, doctype, table_name, primary_key):
+	pk_condition = ""
+	if primary_key:
+		pk_condition = " AND ".join(f"{col.get('COLUMN_NAME')} = '{{{col.get('COLUMN_NAME')}}}'" for col in primary_key)
+	
+	while True:
+		records = db.select("""SELECT TOP 1000 * FROM mpr.[{0}] WHERE is_sync = 0;""".format(table_name))
+		# frappe.log_error(str(records), "Sap migration data table")
+		# stop loop if no rows
+		if not records:
+			break
+		for record in records:
+			update_sync_flag(db, table_name, pk_condition, record, 2)
+		frappe.enqueue(
+			create_data_in_frappe,
+			doctype=doctype,
+			table_name= table_name,
+			pk_condition= pk_condition,
+			records= records,
+			queue="long",
+			timeout=600000
+		)
+		# create_data_in_frappe(doctype, table_name, pk_condition, records)
+
+def create_data_in_frappe(doctype, table_name, pk_condition, records):
+	db = MSSQL()
 	for record in records:
 		file_dict = []
 		doc = frappe.new_doc(doctype)
 		for key, value in record.items():
-			key = key.strip().lower().replace(" ", "_").strip("?")
+			field_name = key.strip().lower().replace(" ", "_").strip("?")
 			
-			if key == "name":
-				key = "name2"
-			elif key == "doctype":
-				key = "doctype1"
-			elif key == "meta":
-				key = "meta1"
-			elif key == "process":
-				key = "process1"
-			elif key in restricted:
-				key = key + "1"
+			if field_name == "name":
+				field_name = "name2"
+			elif field_name == "doctype":
+				field_name = "doctype1"
+			elif field_name == "meta":
+				field_name = "meta1"
+			elif field_name == "process":
+				field_name = "process1"
+			elif field_name in restricted:
+				field_name = field_name + "1"
 			if isinstance(value, (bytes, bytearray)):
-				file_dict.append({key: value})
+				file_dict.append({field_name: value})
 			else:
-				doc.set(key, value)
-		doc.flags.ignore_permissions = True
-		doc.insert(ignore_mandatory=True)
-		frappe.db.commit()
-		for file in file_dict:
-			for key, value in file.items():
-				# frappe.error_log(str(value), "File Value")
-				# print(value)
-				encoded_data = base64.b64encode(value)
-				# frappe.error_log(str(encoded_data), "Encoded File Value")
-				# print(encoded_data)
-				# Create file in Frappe
-				file_doc = frappe.get_doc({
-					"doctype": "File",
-					"file_name": key,
-					"attached_to_doctype": doc.doctype,
-					"attached_to_name": doc.name,
-					"attached_to_field": key,
-					"content": encoded_data,     # base64 string
-					"decode": True,              # auto-decodes base64
-					"is_private": 1,
-					"folder": "Home/Attachments"
-				})
-				file_doc.insert(ignore_permissions=True)
-				doc.set(key, file_doc.file_url)
+				doc.set(field_name, value)
+		doc.flags.ignore_mandatory = True
+		doc.flags.ignore_validate = True
+		doc.flags.ignore_links = True
+		doc.insert(ignore_permissions=True)
+		
+		if file_dict:
+			for file in file_dict:
+				for key, value in file.items():
+					# frappe.error_log(str(value), "File Value")
+					# print(value)
+					encoded_data = base64.b64encode(value)
+					# frappe.error_log(str(encoded_data), "Encoded File Value")
+					# print(encoded_data)
+					# Create file in Frappe
+					file_doc = frappe.get_doc({
+						"doctype": "File",
+						"file_name": key,
+						"attached_to_doctype": doc.doctype,
+						"attached_to_name": doc.name,
+						"attached_to_field": key,
+						"content": encoded_data,     # base64 string
+						"decode": True,              # auto-decodes base64
+						"is_private": 1,
+						"folder": "Home/Attachments"
+					})
+					file_doc.flags.ignore_mandatory = True
+					file_doc.flags.ignore_validate = True
+					file_doc.flags.ignore_links = True
+					file_doc.insert(ignore_permissions=True)
+					doc.set(key, file_doc.file_url)
 			doc.save(ignore_permissions=True)
-			frappe.db.commit()
-	log = frappe.get_doc("Database Table Migration Log", doctype)
-	log.data_migrated = 1
-	log.save(ignore_permissions=True)
+
+		# update sync flag
+		update_sync_flag(db, table_name, pk_condition, record, 1)
+		frappe.db.commit()
+		# db.run("""UPDATE mpr.[{table_name}]
+		# 	SET is_sync = 1
+		# 	WHERE {pk_condition};""",table_name=table_name, pk_condition=pk_condition, record=record
+		# )
+
+def update_sync_flag(db, table_name, pk_condition, record, flag):
+	mssql_query = f"""UPDATE mpr.[{table_name}]
+		SET is_sync = {flag}
+		WHERE {pk_condition};"""
+	db.execute(mssql_query.format(**record))
+
+
+
+
 

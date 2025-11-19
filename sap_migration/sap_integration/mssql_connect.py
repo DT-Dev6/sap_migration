@@ -25,7 +25,7 @@ class MSSQL:
         except Exception as e:
             frappe.throw("❌ Error:", e)
 
-    def run(self, query):
+    def select(self, query):
         try:
             self.cursor.execute(query)
             columns = [col[0] for col in self.cursor.description]
@@ -34,6 +34,13 @@ class MSSQL:
             return data
         except Exception as e:
             frappe.throw("❌ Data Error:", e)
+
+    def execute(self, query):
+        # try:
+        self.cursor.execute(query)
+        self.conn.commit()
+        # except Exception as e:
+        #     frappe.throw("❌ Execution Error:", e)
 
 
 
