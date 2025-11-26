@@ -121,9 +121,11 @@ def msql_error_data_table_migration():
 	error_tables = frappe.db.get_all("Database Table Migration Log",
 		filters={
 			"table_created": 1,
-			"data_migrated": 0,
-			"name": "mpr-FAGLFLEXA"
+			"data_migrated": 0
+			# "name": "mpr-FAGLFLEXA"
 		},
+		start=0,
+		page_length=10,
 		fields=["table_name", "doctype_name"]
 	)
 	
@@ -141,6 +143,11 @@ def msql_error_data_table_migration():
 				queue="long",
 				timeout=600000
 			)
+	frappe.enqueue(
+		msql_error_data_table_migration,   # 👈 function reference, not string
+		queue="long",
+		timeout=600000
+	)
 
 def mssql_table_migration():
 	db = MSSQL()
@@ -332,7 +339,16 @@ def mssql_table_data_migration(doctype, table_name):
 		frappe.throw(f"❌ Primary Key not found for table {table_name}")
 
 	get_mssql_data(db, doctype, table_name, primary_key)
+
+	frappe.enqueue(
+		update_data_migration_flag,
+		doctype=doctype,
+		queue="long",
+		timeout=600000
+	)
 	
+
+def update_data_migration_flag(doctype):
 	log = frappe.get_doc("Database Table Migration Log", doctype)
 	log.data_migrated = 1
 	log.flags.ignore_mandatory = True
