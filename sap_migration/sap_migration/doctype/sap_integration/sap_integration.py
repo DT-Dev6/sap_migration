@@ -143,11 +143,11 @@ def msql_error_data_table_migration():
 				queue="long",
 				timeout=600000
 			)
-	frappe.enqueue(
-		msql_error_data_table_migration,   # 👈 function reference, not string
-		queue="long",
-		timeout=600000
-	)
+	# frappe.enqueue(
+	# 	msql_error_data_table_migration,   # 👈 function reference, not string
+	# 	queue="long",
+	# 	timeout=600000
+	# )
 
 def mssql_table_migration():
 	db = MSSQL()
@@ -186,8 +186,7 @@ def get_mssql_table_columns(db, table_name):
 		WHERE TABLE_NAME = '{0}';
 	""".format(table_name))
 	return columns
-		
-		
+
 
 def create_doctype(doctype_name: str, columns: list, table_name: str):
 	doctype = frappe.new_doc("DocType")
@@ -295,7 +294,6 @@ def create_doctype(doctype_name: str, columns: list, table_name: str):
 		queue="long",
 		timeout=600000
 	)
-	
 
 
 def convert_mssql_to_frappe(dtype: str) -> str:
@@ -325,10 +323,16 @@ def mssql_table_data_migration(doctype, table_name):
 	primary_key = db.select("""SELECT 
 			KU.TABLE_NAME,
 			KU.COLUMN_NAME,
-			KU.ORDINAL_POSITION
+			KU.ORDINAL_POSITION,
+			C.DATA_TYPE
 		FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS AS TC
 		JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE AS KU
 			ON TC.CONSTRAINT_NAME = KU.CONSTRAINT_NAME
+			AND TC.TABLE_SCHEMA = KU.TABLE_SCHEMA
+		JOIN INFORMATION_SCHEMA.COLUMNS AS C
+			ON KU.TABLE_NAME = C.TABLE_NAME
+			AND KU.COLUMN_NAME = C.COLUMN_NAME
+			AND KU.TABLE_SCHEMA = C.TABLE_SCHEMA
 		WHERE TC.TABLE_NAME = '{0}'
 			AND TC.CONSTRAINT_TYPE = 'PRIMARY KEY'
 			AND TC.TABLE_SCHEMA = 'mpr'
@@ -346,7 +350,7 @@ def mssql_table_data_migration(doctype, table_name):
 		queue="long",
 		timeout=600000
 	)
-	
+
 
 def update_data_migration_flag(doctype):
 	log = frappe.get_doc("Database Table Migration Log", doctype)
@@ -358,28 +362,39 @@ def update_data_migration_flag(doctype):
 
 
 def get_mssql_data(db, doctype, table_name, primary_key):
-	pk_condition = ""
-	if primary_key:
-		pk_condition = " AND ".join(f"{col.get('COLUMN_NAME')} = '{{{col.get('COLUMN_NAME')}}}'" for col in primary_key)
-	
-	while True:
-		records = db.select("""SELECT TOP 1000 * FROM mpr.[{0}] WHERE erpnext_is_sync = 0;""".format(table_name))
-		# frappe.log_error(str(records), "Sap migration data table")
-		# stop loop if no rows
-		if not records:
-			break
-		for record in records:
-			update_sync_flag(db, table_name, pk_condition, record, 2)
-		frappe.enqueue(
-			create_data_in_frappe,
-			doctype=doctype,
-			table_name= table_name,
-			pk_condition= pk_condition,
-			records= records,
-			queue="long",
-			timeout=600000
-		)
-		# create_data_in_frappe(doctype, table_name, pk_condition, records)
+    pk_condition = ""
+    if primary_key:
+        pk_condition = " AND ".join(
+            (
+                f"[{col.get('COLUMN_NAME')}] = {{{col.get('COLUMN_NAME')}}}"
+                if col.get("DATA_TYPE") == "varbinary"
+                else f"[{col.get('COLUMN_NAME')}] = '{{{col.get('COLUMN_NAME')}}}'"
+            )
+            for col in primary_key
+        )
+
+    while True:
+        records = db.select(
+            """SELECT TOP 1000 * FROM mpr.[{0}] WHERE erpnext_is_sync = 0;""".format(
+                table_name
+            )
+        )
+        # frappe.log_error(str(records), "Sap migration data table")
+        # stop loop if no rows
+        if not records:
+            break
+        for record in records:
+            update_sync_flag(db, table_name, pk_condition, record, 2)
+        frappe.enqueue(
+            create_data_in_frappe,
+            doctype=doctype,
+            table_name=table_name,
+            pk_condition=pk_condition,
+            records=records,
+            queue="long",
+            timeout=600000,
+        )
+        # create_data_in_frappe(doctype, table_name, pk_condition, records)
 
 def create_data_in_frappe(doctype, table_name, pk_condition, records):
 	db = MSSQL()
@@ -440,15 +455,17 @@ def create_data_in_frappe(doctype, table_name, pk_condition, records):
 		# update sync flag
 		update_sync_flag(db, table_name, pk_condition, record, 1)
 		frappe.db.commit()
-		
+
 
 def update_sync_flag(db, table_name, pk_condition, record, flag):
+	cond_values = record.copy()
+	for c in cond_values:
+		if isinstance(cond_values[c], (bytes, bytearray)):
+			cond_values[c] = '0x' + cond_values[c].hex()
+		elif isinstance(cond_values[c], str):
+			cond_values[c] = cond_values[c].replace("'", "''")
+
 	mssql_query = f"""UPDATE mpr.[{table_name}]
 		SET erpnext_is_sync = {flag}
 		WHERE {pk_condition};"""
-	db.execute(mssql_query.format(**record))
-
-
-
-
-
+	db.execute(mssql_query.format(**cond_values))
