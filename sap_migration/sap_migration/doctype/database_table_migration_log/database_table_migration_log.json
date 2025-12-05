@@ -10,7 +10,8 @@
   "table_name",
   "table_created",
   "data_migrated",
-  "no_columns"
+  "no_columns",
+  "in_progress"
  ],
  "fields": [
   {
@@ -22,31 +23,44 @@
   {
    "fieldname": "table_name",
    "fieldtype": "Data",
+   "in_list_view": 1,
    "label": "table_name"
   },
   {
    "default": "0",
    "fieldname": "table_created",
    "fieldtype": "Check",
-   "label": "Table Created"
+   "in_list_view": 1,
+   "label": "Table Created",
+   "search_index": 1
   },
   {
    "default": "0",
    "fieldname": "data_migrated",
    "fieldtype": "Check",
-   "label": "Data Migrated"
+   "in_list_view": 1,
+   "label": "Data Migrated",
+   "search_index": 1
   },
   {
    "default": "0",
    "fieldname": "no_columns",
    "fieldtype": "Check",
    "label": "No Columns"
+  },
+  {
+   "default": "0",
+   "fieldname": "in_progress",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "in progress",
+   "search_index": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-11-15 15:40:01.026296",
+ "modified": "2025-12-05 13:34:04.315636",
  "modified_by": "Administrator",
  "module": "SAP Migration",
  "name": "Database Table Migration Log",
