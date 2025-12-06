@@ -119,7 +119,7 @@ def msql_error_table_migration():
             log.save(ignore_permissions=True)
             frappe.db.commit()
 
-def msql_error_data_table_migration(page_length=5):
+def msql_error_data_table_migration(page_length=2000):
     error_tables = frappe.db.get_all("Database Table Migration Log",
         filters={
             "table_created": 1,
@@ -147,6 +147,11 @@ def msql_error_data_table_migration(page_length=5):
         #     doctype=table.get("doctype_name"),
         #     table_name= table.get("table_name")
         # )
+    frappe.enqueue(
+        msql_error_data_table_migration,   # 👈 function reference, not string
+        queue="long",
+        timeout=600000
+    )
 
 
 def mssql_table_migration():
@@ -375,23 +380,23 @@ def mssql_table_data_migration(doctype, table_name):
 
     get_mssql_data(db, doctype, table_name, primary_key)
 
-    frappe.enqueue(
-        update_data_migration_flag,
-        doctype=doctype,
-        queue="long",
-        timeout=600000
-    )
-    # update_data_migration_flag(doctype)
+    # frappe.enqueue(
+    #     update_data_migration_flag,
+    #     doctype=doctype,
+    #     queue="long",
+    #     timeout=600000
+    # )
+    update_data_migration_flag(doctype)
 
 
 def update_data_migration_flag(doctype):
     frappe.db.set_value("Database Table Migration Log", doctype, "data_migrated", 1, update_modified=True)
-    frappe.enqueue(
-        msql_error_data_table_migration,   # 👈 function reference, not string
-        page_length=1,
-        queue="long",
-        timeout=600000
-    )
+    # frappe.enqueue(
+    #     msql_error_data_table_migration,   # 👈 function reference, not string
+    #     page_length=1,
+    #     queue="long",
+    #     timeout=600000
+    # )
     # log = frappe.get_doc("Database Table Migration Log", doctype)
     # log.data_migrated = 1
     # log.flags.ignore_mandatory = True
@@ -430,16 +435,16 @@ def get_mssql_data(db, doctype, table_name, primary_key):
             break
         for record in records:
             update_sync_flag(db, table_name, pk_condition, record, 2)
-        frappe.enqueue(
-            create_data_in_frappe,
-            doctype=doctype,
-            table_name=table_name,
-            pk_condition=pk_condition,
-            records=records,
-            queue="long",
-            timeout=600000,
-        )
-        # create_data_in_frappe(doctype, table_name, pk_condition, records)
+        # frappe.enqueue(
+        #     create_data_in_frappe,
+        #     doctype=doctype,
+        #     table_name=table_name,
+        #     pk_condition=pk_condition,
+        #     records=records,
+        #     queue="long",
+        #     timeout=600000,
+        # )
+        create_data_in_frappe(doctype, table_name, pk_condition, records)
 
 
 def create_data_in_frappe(doctype, table_name, pk_condition, records):
