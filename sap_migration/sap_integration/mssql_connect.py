@@ -2,10 +2,16 @@ import frappe
 import pyodbc
 
 # --- Connection Settings ---
+# SERVER   = '192.168.12.1'      # or 'localhost'
+# DATABASE = 'MPR'
+# USERNAME = 'sa'
+# PASSWORD = 'qwedsa'
+
+
 SERVER   = '192.168.12.1'      # or 'localhost'
 DATABASE = 'MPR'
-USERNAME = 'sa'
-PASSWORD = 'qwedsa'
+USERNAME = 'sap'
+PASSWORD = 'Qwedsa@123'
 
 # --- Optimized Connection String ---
 CONN_STR = (
