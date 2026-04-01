@@ -119,7 +119,7 @@ def msql_error_table_migration():
             log.save(ignore_permissions=True)
             frappe.db.commit()
 
-def msql_error_data_table_migration(page_length=2000):
+def msql_error_data_table_migration(page_length=60):
     error_tables = frappe.db.get_all("Database Table Migration Log",
         filters={
             "table_created": 1,
@@ -292,13 +292,13 @@ def create_doctype(doctype_name: str, columns: list, table_name: str):
     log.save(ignore_permissions=True)
 
     frappe.db.commit()
-    frappe.enqueue(
-        mssql_table_data_migration,
-        doctype=doctype_name,
-        table_name= table_name,
-        queue="long",
-        timeout=600000
-    )
+    # frappe.enqueue(
+    #     mssql_table_data_migration,
+    #     doctype=doctype_name,
+    #     table_name= table_name,
+    #     queue="long",
+    #     timeout=600000
+    # )
 
 
 def convert_mssql_to_frappe(dtype: str) -> str:
