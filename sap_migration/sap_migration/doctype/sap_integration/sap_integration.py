@@ -97,6 +97,12 @@ def msql_error_table_migration():
     for table in error_tables:
         table_name = table.get("table_name")
         doctype_name = table.get("doctype_name")
+        if frappe.db.exists("DocType", doctype_name):
+            doc = frappe.get_doc("DocType", doctype_name)
+            doc.delete()
+            # frappe.db.commit()
+            frappe.db.sql("drop table if exists `tab{0}`".format(doctype_name))
+            frappe.db.commit()
         columns = db.select("""SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH 
             FROM INFORMATION_SCHEMA.COLUMNS 
             WHERE TABLE_NAME = '{0}';
