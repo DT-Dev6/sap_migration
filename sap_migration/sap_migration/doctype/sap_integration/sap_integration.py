@@ -138,26 +138,26 @@ def msql_error_data_table_migration(page_length=60):
         fields=["table_name", "doctype_name"],
         order_by='modified desc',
     )
-    
-    for table in error_tables:
-        frappe.db.set_value("Database Table Migration Log", table.get("doctype_name"), "in_progress", 1, update_modified=True)
-        frappe.db.commit()
+    if error_tables:
+        for table in error_tables:
+            frappe.db.set_value("Database Table Migration Log", table.get("doctype_name"), "in_progress", 1, update_modified=True)
+            frappe.db.commit()
+            frappe.enqueue(
+                mssql_table_data_migration,
+                doctype=table.get("doctype_name"),
+                table_name= table.get("table_name"),
+                queue="long",
+                timeout=600000
+            )
+            # mssql_table_data_migration(
+            #     doctype=table.get("doctype_name"),
+            #     table_name= table.get("table_name")
+            # )
         frappe.enqueue(
-            mssql_table_data_migration,
-            doctype=table.get("doctype_name"),
-            table_name= table.get("table_name"),
+            msql_error_data_table_migration,   # 👈 function reference, not string
             queue="long",
             timeout=600000
         )
-        # mssql_table_data_migration(
-        #     doctype=table.get("doctype_name"),
-        #     table_name= table.get("table_name")
-        # )
-    frappe.enqueue(
-        msql_error_data_table_migration,   # 👈 function reference, not string
-        queue="long",
-        timeout=600000
-    )
 
 
 def mssql_table_migration():
