@@ -8,7 +8,7 @@ import pyodbc
 # PASSWORD = 'qwedsa'
 
 
-SERVER   = '192.168.12.1'      # or 'localhost'
+SERVER   = 'localhost'      # or 'localhost'
 DATABASE = 'MPR'
 USERNAME = 'sap'
 PASSWORD = 'Qwedsa@123'
@@ -25,21 +25,21 @@ CONN_STR = (
 
 class MSSQL:
     def __init__(self):
-        try:
-            self.conn = pyodbc.connect(CONN_STR, autocommit=True)
-            self.cursor = self.conn.cursor()
-        except Exception as e:
-            frappe.throw("❌ Error:", e)
+        # try:
+        self.conn = pyodbc.connect(CONN_STR, autocommit=True)
+        self.cursor = self.conn.cursor()
+        # except Exception as e:
+        #     frappe.throw("❌ Error:", str(e))
 
     def select(self, query):
-        try:
-            self.cursor.execute(query)
-            columns = [col[0] for col in self.cursor.description]
-            data = [dict(zip(columns, row)) for row in self.cursor.fetchall()]
-            # data = self.cursor.fetchall()
-            return data
-        except Exception as e:
-            frappe.throw("❌ Data Error:", e)
+        # try:
+        self.cursor.execute(query)
+        columns = [col[0] for col in self.cursor.description]
+        data = [dict(zip(columns, row)) for row in self.cursor.fetchall()]
+        # data = self.cursor.fetchall()
+        return data
+        # except Exception as e:
+        #     frappe.throw("❌ Data Error:", str(e))
 
     def execute(self, query):
         # try:
