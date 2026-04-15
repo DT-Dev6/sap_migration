@@ -57,6 +57,7 @@ restricted = (
     "file_list",
     "flags",
     "docstatus",
+    "idx"
 )
 
 
@@ -100,7 +101,6 @@ def msql_error_table_migration():
         if frappe.db.exists("DocType", doctype_name):
             doc = frappe.get_doc("DocType", doctype_name)
             doc.delete()
-            # frappe.db.commit()
             frappe.db.sql("drop table if exists `tab{0}`".format(doctype_name))
             frappe.db.commit()
         columns = db.select("""SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH 
@@ -215,7 +215,7 @@ def create_doctype(doctype_name: str, columns: list, table_name: str):
             doctype_fields.append({
                 "label": col.get('COLUMN_NAME'),
                 "fieldtype": fieldtype,
-                "fieldname": "name2",
+                "fieldname": "sap_name",
                 "length": length
             })
         elif col.get('COLUMN_NAME').lower() == "doctype":
@@ -225,7 +225,7 @@ def create_doctype(doctype_name: str, columns: list, table_name: str):
             doctype_fields.append({
                 "label": col.get('COLUMN_NAME'),
                 "fieldtype": fieldtype,
-                "fieldname": "doctype1",
+                "fieldname": "sap_doctype",
                 "length": length
             })
         elif col.get('COLUMN_NAME').lower() == "meta":
@@ -235,7 +235,7 @@ def create_doctype(doctype_name: str, columns: list, table_name: str):
             doctype_fields.append({
                 "label": col.get('COLUMN_NAME'),
                 "fieldtype": fieldtype,
-                "fieldname": "meta1",
+                "fieldname": "sap_meta",
                 "length": length
             })
         elif col.get('COLUMN_NAME').lower() == "process":
@@ -245,7 +245,7 @@ def create_doctype(doctype_name: str, columns: list, table_name: str):
             doctype_fields.append({
                 "label": col.get('COLUMN_NAME'),
                 "fieldtype": fieldtype,
-                "fieldname": "process1",
+                "fieldname": "sap_process",
                 "length": length
             })
         elif col.get('COLUMN_NAME').lower() == "field_order":
@@ -255,7 +255,17 @@ def create_doctype(doctype_name: str, columns: list, table_name: str):
             doctype_fields.append({
                 "label": col.get('COLUMN_NAME'),
                 "fieldtype": fieldtype,
-                "fieldname": "field_order1",
+                "fieldname": "sap_field_order",
+                "length": length
+            })
+        elif col.get('COLUMN_NAME').lower() in restricted:
+            length = None
+            if col.get('CHARACTER_MAXIMUM_LENGTH'):
+                length = cint(col.get('CHARACTER_MAXIMUM_LENGTH')) + 1
+            doctype_fields.append({
+                "label": col.get('COLUMN_NAME'),
+                "fieldtype": fieldtype,
+                "fieldname": "sap_" + col.get('COLUMN_NAME').lower(),
                 "length": length
             })
         elif fieldtype == "Data" and col.get('CHARACTER_MAXIMUM_LENGTH'):
@@ -470,17 +480,17 @@ def create_data_in_frappe(doctype, table_name, pk_condition, records):
             field_name = key.strip().lower().replace(" ", "_").strip("?").replace("/", "")
             
             if field_name == "name":
-                field_name = "name2"
+                field_name = "sap_name"
             elif field_name == "doctype":
-                field_name = "doctype1"
+                field_name = "sap_doctype"
             elif field_name == "meta":
-                field_name = "meta1"
+                field_name = "sap_meta"
             elif field_name == "process":
-                field_name = "process1"
+                field_name = "sap_process"
             elif field_name == "field_order":
-                field_name = "field_order1"
+                field_name = "sap_field_order"
             elif field_name in restricted:
-                field_name = field_name + "1"
+                field_name = "sap_" + field_name
             if not isinstance(value, (bytes, bytearray)) and field_name != "erpnext_is_sync":
                 fields.append(field_name)
 
