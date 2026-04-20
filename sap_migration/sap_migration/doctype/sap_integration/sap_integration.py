@@ -71,6 +71,14 @@ class SAPIntegration(Document):
         )
 
     @frappe.whitelist()
+    def drop_error_tables(self):
+        frappe.enqueue(
+            mysql_error_tables,   # 👈 function reference, not string
+            queue="long",
+            timeout=600000
+        )
+
+    @frappe.whitelist()
     def migrate_error_tables(self):
         frappe.enqueue(
             msql_error_table_migration,   # 👈 function reference, not string
@@ -87,7 +95,55 @@ class SAPIntegration(Document):
         )
         # msql_error_data_table_migration()
 
-def msql_error_table_migration():
+    @frappe.whitelist()
+    def compare_data_tables(self):
+        frappe.enqueue(
+            compare_data,   # 👈 function reference, not string
+            queue="long",
+            timeout=600000
+        )
+
+
+def compare_data():
+    migrated_tables = frappe.db.get_all("Database Table Migration Log",
+        filters={
+            "table_created": 1,
+            "data_migrated": 1,
+            "completed": 0
+        },
+        fields=["table_name", "doctype_name"]
+    )
+    for table in migrated_tables:
+        frappe.enqueue(
+            update_data_count,
+            doctype_name=table.get("doctype_name"),
+            table_name=table.get("table_name"),
+            queue="long",
+            timeout=600000
+        )
+
+def update_data_count(doctype_name, table_name):
+    db = MSSQL()
+    count_in_mssql = cint(db.select(f"SELECT COUNT(*) AS count FROM mpr.[{table_name}]")[0].get("count"))
+    frappe.db.set_value("Database Table Migration Log",
+        doctype_name,
+        "mssql_count",
+        count_in_mssql,
+        update_modified=True
+    )
+    count_in_frappe = cint(frappe.db.count(doctype_name))
+    frappe.db.set_value("Database Table Migration Log",
+        doctype_name,
+        "mariadb_count",
+        count_in_frappe, 
+        update_modified=True
+    )
+    if count_in_mssql == count_in_frappe:
+        frappe.db.set_value("Database Table Migration Log", doctype_name, "completed", 1, update_modified=True)
+    else:
+        frappe.db.set_value("Database Table Migration Log", doctype_name, "completed", 0, update_modified=True)
+
+def mysql_error_tables():
     db = MSSQL()
     error_tables = frappe.db.get_all("Database Table Migration Log",
         filters={
@@ -106,6 +162,26 @@ def msql_error_table_migration():
                 f"DROP TABLE IF EXISTS `tab{doctype_name}`;",
                 ignore_ddl=True
             )
+
+def msql_error_table_migration():
+    db = MSSQL()
+    error_tables = frappe.db.get_all("Database Table Migration Log",
+        filters={
+            "table_created": 0
+        },
+        fields=["table_name", "doctype_name"]
+    )
+    for table in error_tables:
+        table_name = table.get("table_name")
+        doctype_name = table.get("doctype_name")
+        # if frappe.db.exists("DocType", doctype_name):
+        #     doc = frappe.get_doc("DocType", doctype_name)
+        #     doc.delete()
+        #     frappe.db.commit()
+        #     frappe.db.sql(
+        #         f"DROP TABLE IF EXISTS `tab{doctype_name}`;",
+        #         ignore_ddl=True
+        #     )
             # frappe.db.sql("drop table if exists `tab{0}`".format(doctype_name))
         columns = db.select("""SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH 
             FROM INFORMATION_SCHEMA.COLUMNS 
@@ -129,7 +205,7 @@ def msql_error_table_migration():
             log.save(ignore_permissions=True)
             frappe.db.commit()
 
-def msql_error_data_table_migration(page_length=120):
+def msql_error_data_table_migration(page_length=5000):
     error_tables = frappe.db.get_all("Database Table Migration Log",
         filters={
             "table_created": 1,

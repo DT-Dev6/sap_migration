@@ -1,5 +1,6 @@
 {
  "actions": [],
+ "allow_import": 1,
  "allow_rename": 1,
  "autoname": "field:doctype_name",
  "creation": "2025-11-12 10:57:58.067295",
@@ -11,7 +12,10 @@
   "table_created",
   "data_migrated",
   "no_columns",
-  "in_progress"
+  "in_progress",
+  "mssql_count",
+  "mariadb_count",
+  "completed"
  ],
  "fields": [
   {
@@ -24,7 +28,8 @@
    "fieldname": "table_name",
    "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "table_name"
+   "label": "table_name",
+   "read_only": 1
   },
   {
    "default": "0",
@@ -46,7 +51,8 @@
    "default": "0",
    "fieldname": "no_columns",
    "fieldtype": "Check",
-   "label": "No Columns"
+   "label": "No Columns",
+   "read_only": 1
   },
   {
    "default": "0",
@@ -55,12 +61,32 @@
    "in_list_view": 1,
    "label": "in progress",
    "search_index": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "mssql_count",
+   "fieldtype": "Int",
+   "label": "MSSQL Count",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "mariadb_count",
+   "fieldtype": "Int",
+   "label": "Mariadb Count",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "completed",
+   "fieldtype": "Check",
+   "label": "Completed"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-12-05 13:34:04.315636",
+ "modified": "2026-04-20 17:07:09.278838",
  "modified_by": "Administrator",
  "module": "SAP Migration",
  "name": "Database Table Migration Log",
