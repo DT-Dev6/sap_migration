@@ -519,13 +519,21 @@ def get_mssql_data(db, doctype, table_name, primary_key):
     db.execute("""UPDATE mpr.[{0}]
         SET erpnext_is_sync = 0 WHERE erpnext_is_sync = 2;""".format(table_name))
 
-    while True:
-        records = db.select(
-            """SELECT TOP 1000 * FROM mpr.[{0}] WHERE erpnext_is_sync = 0;""".format(
-                table_name
-            )
+    db.cursor.execute(
+        """SELECT * FROM mpr.[{0}] WHERE erpnext_is_sync = 0;""".format(
+            table_name
         )
-        # frappe.log_error(str(records), "Sap migration data table")
+    )
+    columns = [col[0] for col in db.cursor.description]
+
+    while True:
+        # records = db.select(
+        #     """SELECT TOP 1000 * FROM mpr.[{0}] WHERE erpnext_is_sync = 0;""".format(
+        #         table_name
+        #     )
+        # )
+        rows = cursor.fetchmany(1000)
+        records = [dict(zip(columns, row)) for row in db.cursor.fetchmany(1000)]
         # stop loop if no rows
         if not records:
             break
