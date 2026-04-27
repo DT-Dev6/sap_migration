@@ -471,8 +471,8 @@ def mssql_table_data_migration(doctype, table_name):
             ic.key_ordinal;
     """.format(table_name))
 
-    if not primary_key:
-        frappe.throw(f"❌ Primary Key not found for table {table_name}")
+    # if not primary_key:
+    #     frappe.throw(f"❌ Primary Key not found for table {table_name}")
 
     get_mssql_data(db, doctype, table_name, primary_key)
 
@@ -532,13 +532,12 @@ def get_mssql_data(db, doctype, table_name, primary_key):
         #         table_name
         #     )
         # )
-        rows = cursor.fetchmany(1000)
         records = [dict(zip(columns, row)) for row in db.cursor.fetchmany(1000)]
         # stop loop if no rows
         if not records:
             break
-        for record in records:
-            update_sync_flag(db, table_name, pk_condition, record, 2)
+        # for record in records:
+        #     update_sync_flag(db, table_name, pk_condition, record, 2)
         # frappe.enqueue(
         #     create_data_in_frappe,
         #     doctype=doctype,
@@ -595,12 +594,14 @@ def create_data_in_frappe(doctype, table_name, pk_condition, records):
                 if not isinstance(value, (bytes, bytearray)) and key != "erpnext_is_sync":
                     values = values + (value,)
             insert_data.append(values)
+        frappe.log_error(title="Fields for Bulk Insert", message=str(fields))
+        frappe.log_error(title="Number of Records for Bulk Insert", message=str(insert_data))
 
         frappe.db.bulk_insert(doctype, fields=fields, values=set(insert_data))
 
-        for record in records:
-            # update sync flag
-            update_sync_flag(db, table_name, pk_condition, record, 1)
+        # for record in records:
+        #     # update sync flag
+        #     update_sync_flag(db, table_name, pk_condition, record, 1)
         frappe.db.commit()
                     
 

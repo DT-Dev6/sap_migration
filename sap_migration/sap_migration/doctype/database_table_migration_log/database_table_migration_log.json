@@ -15,7 +15,8 @@
   "in_progress",
   "mssql_count",
   "mariadb_count",
-  "completed"
+  "completed",
+  "remark"
  ],
  "fields": [
   {
@@ -81,12 +82,17 @@
    "fieldname": "completed",
    "fieldtype": "Check",
    "label": "Completed"
+  },
+  {
+   "fieldname": "remark",
+   "fieldtype": "Data",
+   "label": "Remark"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-04-20 17:07:09.278838",
+ "modified": "2026-04-22 12:24:00.326417",
  "modified_by": "Administrator",
  "module": "SAP Migration",
  "name": "Database Table Migration Log",
