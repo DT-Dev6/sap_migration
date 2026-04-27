@@ -12,20 +12,40 @@ frappe.query_reports["FBL5N"] = {
         },
         {
             fieldname: "fiscal_year",
-            label: "Fiscal Year",
+            label: "Year",
+            fieldtype: "Data"
+        },
+        {
+            fieldname: "fiscal_month",
+            label: "Month",
             fieldtype: "Data"
         },
         {
             fieldname: "from_date",
             label: "From Date",
             fieldtype: "Date",
-            reqd: 1
+            // reqd: 1
         },
         {
             fieldname: "to_date",
             label: "To Date",
             fieldtype: "Date",
-            reqd: 1
-        }
+            // reqd: 1
+        },
+        {
+            fieldname: "customer_number",
+            label: "Customer No",
+            fieldtype: "Data"
+        },
+        {
+            fieldname: "document_number",
+            label: "Document No",
+            fieldtype: "Data"
+        },
+        // {
+        //     fieldname: "entered_by",
+        //     label: "Entered By",
+        //     fieldtype: "Data"
+        // },
     ]
 };

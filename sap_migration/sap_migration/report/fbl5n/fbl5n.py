@@ -44,6 +44,40 @@ def get_data(filters):
     conditions = []
     values = {}
 
+    if filters.get("company_code"):
+        conditions.append("BUKRS = %(company_code)s")
+        values["company_code"] = filters["company_code"]
+
+    if filters.get("fiscal_year"):
+        conditions.append("GJAHR = %(fiscal_year)s")
+        values["fiscal_year"] = filters["fiscal_year"]
+
+    if filters.get("fiscal_month"):
+        conditions.append("MONAT = %(fiscal_month)s")
+        values["fiscal_month"] = filters["fiscal_month"]
+
+    if filters.get("customer_number"):
+        conditions.append("KUNNR = %(customer_number)s")
+        values["customer_number"] = filters["customer_number"]
+    
+    if filters.get("document_number"):
+        conditions.append("BELNR = %(document_number)s")
+        values["document_number"] = filters["document_number"]
+
+    # if filters.get("entered_by"):
+    #     conditions.append("h.USNAM = %(entered_by)s")
+    #     values["entered_by"] = filters["entered_by"]
+
+    # frappe.throw(type(filters.get("from_date")))
+
+    if filters.get("from_date"):
+        conditions.append("STR_TO_DATE(budat, '%%Y%%m%%d') >=  %(from_date)s")
+        values["from_date"] = filters["from_date"]
+
+    if filters.get("to_date"):
+        conditions.append("STR_TO_DATE(budat, '%%Y%%m%%d') <= %(to_date)s")
+        values["to_date"] = filters["to_date"]
+
     where_clause = " AND ".join(conditions) if conditions else "1=1"
 
     company_code = filters.get("company_code")
@@ -58,10 +92,7 @@ def get_data(filters):
             BSCHL, BUPLA, PRCTR,
             'Open' AS Item_Status
         FROM `tabmpr-BSID`
-        WHERE BUKRS = '{company_code}' -- Optional: Filter by Company Code
-            and STR_TO_DATE(budat, '%Y%m%d') >= '{from_date}'
-            and STR_TO_DATE(budat, '%Y%m%d') <= '{to_date}'
-        -- AND KUNNR = '0000200000' -- Optional: Filter by specific Customer
+        WHERE {where_clause} 
         
         UNION ALL
         
@@ -72,10 +103,7 @@ def get_data(filters):
             BSCHL, BUPLA, PRCTR,
             'Cleared' AS Item_Status
         FROM `tabmpr-BSAD`
-        WHERE BUKRS = '{company_code}' -- Optional: Filter by Company Code
-            and STR_TO_DATE(budat, '%Y%m%d') >= '{from_date}'
-            and STR_TO_DATE(budat, '%Y%m%d') <= '{to_date}' 
-        -- AND KUNNR = '0000200000' 
+        WHERE {where_clause}
     )
     
     SELECT 
@@ -140,7 +168,7 @@ def get_data(filters):
     """
     frappe.errprint(query)
 
-    data = frappe.db.sql(query, as_dict=True)
+    data = frappe.db.sql(query, values, as_dict=True)
     balance = 0
     for i in data:
         balance += i.get("amount_local_currency", 0)
