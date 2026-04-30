@@ -24,8 +24,8 @@ build-backend = "flit_core.buildapi"
 
 [deploy.dependencies.apt]
 packages = [
-    "unixodbc~=2.3.9",
-    "unixodbc-dev~=2.3.9-5ubuntu0.1"
+    "unixodbc",
+    "unixodbc-dev"
 ]
 
 [tool.ruff]
