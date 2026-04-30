@@ -1,5 +1,4 @@
 import frappe
-import pyodbc
 
 # --- Connection Settings ---
 # SERVER   = '192.168.12.1'      # or 'localhost'
@@ -25,6 +24,7 @@ CONN_STR = (
 
 class MSSQL:
     def __init__(self):
+        import pyodbc
         # try:
         self.conn = pyodbc.connect(CONN_STR, autocommit=True)
         self.cursor = self.conn.cursor()
