@@ -22,9 +22,11 @@ build-backend = "flit_core.buildapi"
 [tool.bench.dev-dependencies]
 # package_name = "~=1.1.0"
 
-[tool.bench.dev-dependencies]
-unixodbc = "~=2.3.9"
-unixodbc-dev = "~=2.3.9-5ubuntu0.1"
+[deploy.dependencies.apt]
+packages = [
+    "unixodbc~=2.3.9",
+    "unixodbc-dev~=2.3.9-5ubuntu0.1"
+]
 
 [tool.ruff]
 line-length = 110
