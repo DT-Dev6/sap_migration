@@ -4,7 +4,7 @@
 import base64
 import frappe
 from frappe.model.document import Document
-from sap_migration.sap_integration.mssql_connect import MSSQL
+# from sap_migration.sap_integration.mssql_connect import MSSQL
 from frappe.utils import cint, now
 from frappe.model.naming import make_autoname
 
@@ -27,9 +27,9 @@ MSSQL_TO_FRAPPE_TYPES = {
     "nvarchar(max)": "Small Text",
     "text": "Text Editor",
     "ntext": "Text Editor",
-    "binary": "Attach",
-    "varbinary": "Attach",
-    "varbinary(max)": "Attach",
+    "binary": "Long Text",
+    "varbinary": "Long Text",
+    "varbinary(max)": "Long Text",
     "image": "Attach",
     "uniqueidentifier": "Data",
     "date": "Data",
@@ -123,6 +123,7 @@ def compare_data():
         )
 
 def update_data_count(doctype_name, table_name):
+    from sap_migration.sap_integration.mssql_connect import MSSQL
     db = MSSQL()
     count_in_mssql = cint(db.select(f"SELECT COUNT(*) AS count FROM mpr.[{table_name}]")[0].get("count"))
     frappe.db.set_value("Database Table Migration Log",
@@ -144,6 +145,7 @@ def update_data_count(doctype_name, table_name):
         frappe.db.set_value("Database Table Migration Log", doctype_name, "completed", 0, update_modified=True)
 
 def mysql_error_tables():
+    from sap_migration.sap_integration.mssql_connect import MSSQL
     db = MSSQL()
     error_tables = frappe.db.get_all("Database Table Migration Log",
         filters={
@@ -164,6 +166,7 @@ def mysql_error_tables():
             )
 
 def msql_error_table_migration():
+    from sap_migration.sap_integration.mssql_connect import MSSQL
     db = MSSQL()
     error_tables = frappe.db.get_all("Database Table Migration Log",
         filters={
@@ -174,15 +177,7 @@ def msql_error_table_migration():
     for table in error_tables:
         table_name = table.get("table_name")
         doctype_name = table.get("doctype_name")
-        # if frappe.db.exists("DocType", doctype_name):
-        #     doc = frappe.get_doc("DocType", doctype_name)
-        #     doc.delete()
-        #     frappe.db.commit()
-        #     frappe.db.sql(
-        #         f"DROP TABLE IF EXISTS `tab{doctype_name}`;",
-        #         ignore_ddl=True
-        #     )
-            # frappe.db.sql("drop table if exists `tab{0}`".format(doctype_name))
+
         columns = db.select("""SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH 
             FROM INFORMATION_SCHEMA.COLUMNS 
             WHERE TABLE_NAME = '{0}';
@@ -211,7 +206,6 @@ def msql_error_data_table_migration(page_length=5000):
             "table_created": 1,
             "in_progress": 0,
             "data_migrated": 0
-            # "name": "mpr-JCDS"
         },
         start=0,
         page_length=page_length,
@@ -229,18 +223,10 @@ def msql_error_data_table_migration(page_length=5000):
                 queue="long",
                 timeout=600000
             )
-            # mssql_table_data_migration(
-            #     doctype=table.get("doctype_name"),
-            #     table_name= table.get("table_name")
-            # )
-        # frappe.enqueue(
-        #     msql_error_data_table_migration,   # 👈 function reference, not string
-        #     queue="long",
-        #     timeout=600000
-        # )
 
 
 def mssql_table_migration():
+    from sap_migration.sap_integration.mssql_connect import MSSQL
     db = MSSQL()
     database_tables = db.select("""SELECT *
             FROM INFORMATION_SCHEMA.TABLES
@@ -251,10 +237,7 @@ def mssql_table_migration():
         doctype_name = f'{table.get("TABLE_SCHEMA")}-{table.get("TABLE_NAME")}'.replace("-/", "-").replace("/", "-")
         if frappe.db.exists("DocType", doctype_name):
             continue
-        # columns = db.select("""SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH 
-        # 	FROM INFORMATION_SCHEMA.COLUMNS 
-        # 	WHERE TABLE_NAME = '{0}';
-        # """.format(table_name))
+        
         columns = get_mssql_table_columns(db, table_name)
         if not frappe.db.exists("Database Table Migration Log", doctype_name):
             log = frappe.new_doc("Database Table Migration Log")
@@ -388,13 +371,6 @@ def create_doctype(doctype_name: str, columns: list, table_name: str):
     log.save(ignore_permissions=True)
 
     frappe.db.commit()
-    # frappe.enqueue(
-    #     mssql_table_data_migration,
-    #     doctype=doctype_name,
-    #     table_name= table_name,
-    #     queue="long",
-    #     timeout=600000
-    # )
 
 
 def convert_mssql_to_frappe(dtype: str) -> str:
@@ -412,132 +388,95 @@ def mssql_table_data_migration(doctype, table_name):
     # if not db:
     db = MSSQL()
     # create_sync_flag in mssql table
-    columns = get_mssql_table_columns(db, table_name)
-    sync_flag_exists = False
-    for col in columns:
-        if col.get('COLUMN_NAME').lower() == "erpnext_is_sync":
-            sync_flag_exists = True
-            break
-    if not sync_flag_exists:
-        db.execute("""ALTER TABLE mpr.[{0}]
-            ADD erpnext_is_sync INT NOT NULL DEFAULT 0;
-        """.format(table_name))
+    # columns = get_mssql_table_columns(db, table_name)
+    # sync_flag_exists = False
+    # for col in columns:
+    #     if col.get('COLUMN_NAME').lower() == "erpnext_is_sync":
+    #         sync_flag_exists = True
+    #         break
+    # if not sync_flag_exists:
+    #     db.execute("""ALTER TABLE mpr.[{0}]
+    #         ADD erpnext_is_sync INT NOT NULL DEFAULT 0;
+    #     """.format(table_name))
 
-        db.execute("""CREATE INDEX idx_{0}_erpnext_is_sync
-            ON mpr.[{1}] (erpnext_is_sync);
-        """.format(table_name.replace("/", ""), table_name))
+    #     db.execute("""CREATE INDEX idx_{0}_erpnext_is_sync
+    #         ON mpr.[{1}] (erpnext_is_sync);
+    #     """.format(table_name.replace("/", ""), table_name))
 
     # primary_key = db.select("""SELECT 
-    #         KU.TABLE_NAME,
-    #         KU.COLUMN_NAME,
-    #         KU.ORDINAL_POSITION,
-    #         C.DATA_TYPE
-    #     FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS AS TC
-    #     JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE AS KU
-    #         ON TC.CONSTRAINT_NAME = KU.CONSTRAINT_NAME
-    #         AND TC.TABLE_SCHEMA = KU.TABLE_SCHEMA
-    #     JOIN INFORMATION_SCHEMA.COLUMNS AS C
-    #         ON KU.TABLE_NAME = C.TABLE_NAME
-    #         AND KU.COLUMN_NAME = C.COLUMN_NAME
-    #         AND KU.TABLE_SCHEMA = C.TABLE_SCHEMA
-    #     WHERE TC.TABLE_NAME = '{0}'
-    #         AND TC.CONSTRAINT_TYPE = 'PRIMARY KEY'
-    #         AND TC.TABLE_SCHEMA = 'mpr'
-    #     ORDER BY KU.ORDINAL_POSITION;
+    #         c.name AS COLUMN_NAME,
+    #         ic.key_ordinal AS ORDINAL_POSITION,
+    #         t.name AS DATA_TYPE
+    #     FROM sys.indexes i
+    #     JOIN sys.index_columns ic 
+    #         ON i.object_id = ic.object_id 
+    #         AND i.index_id = ic.index_id
+    #     JOIN sys.columns c 
+    #         ON ic.object_id = c.object_id 
+    #         AND ic.column_id = c.column_id
+    #     JOIN sys.types t
+    #         ON c.user_type_id = t.user_type_id
+    #     JOIN sys.tables tb
+    #         ON tb.object_id = i.object_id
+    #     JOIN sys.schemas s
+    #         ON tb.schema_id = s.schema_id
+    #     WHERE 
+    #         i.is_primary_key = 1
+    #         AND tb.name = '{0}'
+    #         AND s.name = 'mpr'
+    #     ORDER BY 
+    #         ic.key_ordinal;
     # """.format(table_name))
-
-    primary_key = db.select("""SELECT 
-            c.name AS COLUMN_NAME,
-            ic.key_ordinal AS ORDINAL_POSITION,
-            t.name AS DATA_TYPE
-        FROM sys.indexes i
-        JOIN sys.index_columns ic 
-            ON i.object_id = ic.object_id 
-            AND i.index_id = ic.index_id
-        JOIN sys.columns c 
-            ON ic.object_id = c.object_id 
-            AND ic.column_id = c.column_id
-        JOIN sys.types t
-            ON c.user_type_id = t.user_type_id
-        JOIN sys.tables tb
-            ON tb.object_id = i.object_id
-        JOIN sys.schemas s
-            ON tb.schema_id = s.schema_id
-        WHERE 
-            i.is_primary_key = 1
-            AND tb.name = '{0}'
-            AND s.name = 'mpr'
-        ORDER BY 
-            ic.key_ordinal;
-    """.format(table_name))
 
     # if not primary_key:
     #     frappe.throw(f"❌ Primary Key not found for table {table_name}")
-
+    primary_key = None
     get_mssql_data(db, doctype, table_name, primary_key)
 
-    # frappe.enqueue(
-    #     update_data_migration_flag,
-    #     doctype=doctype,
-    #     queue="long",
-    #     timeout=600000
-    # )
     update_data_migration_flag(doctype)
 
 
 def update_data_migration_flag(doctype):
     frappe.db.set_value("Database Table Migration Log", doctype, "data_migrated", 1, update_modified=True)
-    # frappe.enqueue(
-    #     msql_error_data_table_migration,   # 👈 function reference, not string
-    #     page_length=1,
-    #     queue="long",
-    #     timeout=600000
-    # )
-    # log = frappe.get_doc("Database Table Migration Log", doctype)
-    # log.data_migrated = 1
-    # log.flags.ignore_mandatory = True
-    # log.flags.ignore_validate = True
-    # log.flags.ignore_links = True
-    # log.save(ignore_permissions=True)
 
 
-def get_mssql_data(db, doctype, table_name, primary_key):
+
+def get_mssql_data(db, doctype, table_name, primary_key=None):
     pk_condition = ""
-    if primary_key:
-        pk_condition = " AND ".join(
-            (
-                f"[{col.get('COLUMN_NAME')}] = {{{col.get('COLUMN_NAME')}}}"
-                if col.get("DATA_TYPE") == "varbinary"
-                else f"[{col.get('COLUMN_NAME')}] = '{{{col.get('COLUMN_NAME')}}}'"
-            )
-            for col in primary_key
-        )
+    # if primary_key:
+    #     pk_condition = " AND ".join(
+    #         (
+    #             f"[{col.get('COLUMN_NAME')}] = {{{col.get('COLUMN_NAME')}}}"
+    #             if col.get("DATA_TYPE") == "varbinary"
+    #             else f"[{col.get('COLUMN_NAME')}] = '{{{col.get('COLUMN_NAME')}}}'"
+    #         )
+    #         for col in primary_key
+    #     )
 
-    db.execute("""UPDATE mpr.[{0}]
-        SET erpnext_is_sync = 0 WHERE erpnext_is_sync = 1;""".format(table_name))
+    # db.execute("""UPDATE mpr.[{0}]
+    #     SET erpnext_is_sync = 0 WHERE erpnext_is_sync = 1;""".format(table_name))
 
-    db.execute("""UPDATE mpr.[{0}]
-        SET erpnext_is_sync = 0 WHERE erpnext_is_sync = 2;""".format(table_name))
+    # db.execute("""UPDATE mpr.[{0}]
+    #     SET erpnext_is_sync = 0 WHERE erpnext_is_sync = 2;""".format(table_name))
 
     db.cursor.execute(
-        """SELECT * FROM mpr.[{0}] WHERE erpnext_is_sync = 0;""".format(
+        """SELECT * FROM mpr.[{0}];""".format(
             table_name
         )
     )
     columns = [col[0] for col in db.cursor.description]
 
     while True:
-        # records = db.select(
-        #     """SELECT TOP 1000 * FROM mpr.[{0}] WHERE erpnext_is_sync = 0;""".format(
-        #         table_name
-        #     )
-        # )
-        records = [dict(zip(columns, row)) for row in db.cursor.fetchmany(1000)]
+        records = [
+            {col: normalize_number(val) for col, val in zip(columns, row)}
+            for row in db.cursor.fetchmany(1000)
+        ]
+
         # stop loop if no rows
         if not records:
             break
-        # for record in records:
-        #     update_sync_flag(db, table_name, pk_condition, record, 2)
+        
+        create_data_in_frappe(doctype, table_name, pk_condition, records)
         # frappe.enqueue(
         #     create_data_in_frappe,
         #     doctype=doctype,
@@ -545,13 +484,18 @@ def get_mssql_data(db, doctype, table_name, primary_key):
         #     pk_condition=pk_condition,
         #     records=records,
         #     queue="long",
-        #     timeout=600000,
+        #     timeout=600000
         # )
-        create_data_in_frappe(doctype, table_name, pk_condition, records)
+
+
+def normalize_number(val):
+    if isinstance(val, float):
+        return format(val, '.0f')  # removes scientific notation
+    return val
 
 
 def create_data_in_frappe(doctype, table_name, pk_condition, records):
-    db = MSSQL()
+    # db = MSSQL()
     user = frappe.session.user
     fields = [
         "name",
@@ -578,10 +522,16 @@ def create_data_in_frappe(doctype, table_name, pk_condition, records):
                 field_name = "sap_field_order"
             elif field_name in restricted:
                 field_name = "sap_" + field_name
-            if not isinstance(value, (bytes, bytearray)) and field_name != "erpnext_is_sync":
+            # if not isinstance(value, (bytes, bytearray)) and field_name != "erpnext_is_sync":
+            #     fields.append(field_name)
+            if field_name != "erpnext_is_sync":
                 fields.append(field_name)
 
+        # frappe.log_error(title="Records for Bulk Insert", message=str(records))
+        # frappe.log_error(title="Fields for Bulk Insert", message=str(fields))
+        # demo = []
         for record in records:
+            # demo_dict = {}
             values = (
                 make_autoname("hash", doctype),
                 now(),
@@ -593,15 +543,17 @@ def create_data_in_frappe(doctype, table_name, pk_condition, records):
             for key, value in record.items():
                 if not isinstance(value, (bytes, bytearray)) and key != "erpnext_is_sync":
                     values = values + (value,)
+                    # demo_dict[key] = value
+                elif isinstance(value, (bytes, bytearray)):
+                    value = str(base64.b64encode(value), 'utf-8')
+                    values = values + (value,)
             insert_data.append(values)
-        frappe.log_error(title="Fields for Bulk Insert", message=str(fields))
-        frappe.log_error(title="Number of Records for Bulk Insert", message=str(insert_data))
+            # demo.append(demo_dict)
+
+        # frappe.log_error(title="Insert Data for Bulk Insert", message=str(insert_data))
+        # frappe.log_error(title="Demo Data for Bulk Insert", message=str(demo))
 
         frappe.db.bulk_insert(doctype, fields=fields, values=set(insert_data))
-
-        # for record in records:
-        #     # update sync flag
-        #     update_sync_flag(db, table_name, pk_condition, record, 1)
         frappe.db.commit()
                     
 
@@ -666,15 +618,15 @@ def create_data_in_frappe(doctype, table_name, pk_condition, records):
     # 	frappe.db.commit()
 
 
-def update_sync_flag(db, table_name, pk_condition, record, flag):
-    cond_values = record.copy()
-    for c in cond_values:
-        if isinstance(cond_values[c], (bytes, bytearray)):
-            cond_values[c] = '0x' + cond_values[c].hex()
-        elif isinstance(cond_values[c], str):
-            cond_values[c] = cond_values[c].replace("'", "''")
+# def update_sync_flag(db, table_name, pk_condition, record, flag):
+#     cond_values = record.copy()
+#     for c in cond_values:
+#         if isinstance(cond_values[c], (bytes, bytearray)):
+#             cond_values[c] = '0x' + cond_values[c].hex()
+#         elif isinstance(cond_values[c], str):
+#             cond_values[c] = cond_values[c].replace("'", "''")
 
-    mssql_query = f"""UPDATE mpr.[{table_name}]
-        SET erpnext_is_sync = {flag}
-        WHERE {pk_condition};"""
-    db.execute(mssql_query.format(**cond_values))
+#     mssql_query = f"""UPDATE mpr.[{table_name}]
+#         SET erpnext_is_sync = {flag}
+#         WHERE {pk_condition};"""
+#     db.execute(mssql_query.format(**cond_values))
