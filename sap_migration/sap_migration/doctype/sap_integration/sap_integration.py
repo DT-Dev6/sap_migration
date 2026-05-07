@@ -13,7 +13,7 @@ MSSQL_TO_FRAPPE_TYPES = {
     "tinyint": "Int",
     "smallint": "Int",
     "int": "Int",
-    "bigint": "Int",
+    "bigint": "Long Int",
     "decimal": "Float",
     "numeric": "Float",
     "money": "Currency",
@@ -30,7 +30,7 @@ MSSQL_TO_FRAPPE_TYPES = {
     "binary": "Long Text",
     "varbinary": "Long Text",
     "varbinary(max)": "Long Text",
-    "image": "Attach",
+    "image": "Data",
     "uniqueidentifier": "Data",
     "date": "Data",
     "time": "Data",
@@ -271,6 +271,8 @@ def create_doctype(doctype_name: str, columns: list, table_name: str):
     doctype_fields = []
     for col in columns:
         fieldtype = convert_mssql_to_frappe(col.get('DATA_TYPE'))
+        if fieldtype == "Data" and col.get('CHARACTER_MAXIMUM_LENGTH') and (col.get('CHARACTER_MAXIMUM_LENGTH') > 140 or col.get('CHARACTER_MAXIMUM_LENGTH') == -1):
+            fieldtype = "Long Text"
         if col.get('COLUMN_NAME').lower() == "name":
             length = None
             if col.get('CHARACTER_MAXIMUM_LENGTH'):
@@ -331,11 +333,17 @@ def create_doctype(doctype_name: str, columns: list, table_name: str):
                 "fieldname": "sap_" + col.get('COLUMN_NAME').lower(),
                 "length": length
             })
-        elif fieldtype == "Data" and col.get('CHARACTER_MAXIMUM_LENGTH'):
+        elif fieldtype in ["Data", "Int"] and col.get('CHARACTER_MAXIMUM_LENGTH'):
             doctype_fields.append({
                 "label": col.get('COLUMN_NAME'),
                 "fieldtype": fieldtype,
                 "length": cint(col.get('CHARACTER_MAXIMUM_LENGTH')) + 1
+            })
+        elif fieldtype == "Long Int":
+            doctype_fields.append({
+                "label": col.get('COLUMN_NAME'),
+                "fieldtype": "Int",
+                "length": 20
             })
         else:
             doctype_fields.append({
@@ -386,6 +394,7 @@ def mssql_table_data_migration(doctype, table_name):
         frappe.db.sql("delete from `tab{0}`".format(doctype))
         frappe.db.commit()
     # if not db:
+    from sap_migration.sap_integration.mssql_connect import MSSQL
     db = MSSQL()
     # create_sync_flag in mssql table
     # columns = get_mssql_table_columns(db, table_name)
@@ -459,18 +468,71 @@ def get_mssql_data(db, doctype, table_name, primary_key=None):
     # db.execute("""UPDATE mpr.[{0}]
     #     SET erpnext_is_sync = 0 WHERE erpnext_is_sync = 2;""".format(table_name))
 
-    db.cursor.execute(
-        """SELECT * FROM mpr.[{0}];""".format(
-            table_name
-        )
-    )
+    columns_info = db.select(f"""
+        SELECT COLUMN_NAME, DATA_TYPE 
+        FROM INFORMATION_SCHEMA.COLUMNS 
+        WHERE TABLE_NAME = '{table_name}'
+    """)
+
+    select_cols = []
+    for col in columns_info:
+        col_name = col["COLUMN_NAME"]
+        dtype = col["DATA_TYPE"]
+
+        # 🚨 FORCE SAFE CAST for problematic columns
+        if col_name.upper() == "BLOCK":
+            select_cols.append(
+                f"CAST({col_name} AS VARBINARY(MAX)) AS {col_name}"
+            )
+
+        elif dtype in ("nvarchar", "varchar", "text", "ntext"):
+            # ✅ safe unicode conversion (prevents crash)
+            select_cols.append(
+                f"TRY_CAST({col_name} AS NVARCHAR(MAX)) AS {col_name}"
+            )
+
+        else:
+            select_cols.append(f"[{col_name}]")
+
+        # if dtype in ("binary", "varbinary", "image"):
+        #     # convert binary to base64 string safely
+        #     select_cols.append(f"CAST({col_name} AS VARBINARY(MAX)) AS {col_name}")
+        # else:
+        #     select_cols.append(f"[{col_name}]")
+
+    query = f"SELECT {', '.join(select_cols)} FROM mpr.[{table_name}]"
+    db.cursor.execute(query)
+
+    # db.cursor.execute(
+    #     """SELECT * FROM mpr.[{0}];""".format(
+    #         table_name
+    #     )
+    # )
     columns = [col[0] for col in db.cursor.description]
 
     while True:
-        records = [
-            {col: normalize_number(val) for col, val in zip(columns, row)}
-            for row in db.cursor.fetchmany(1000)
-        ]
+        # records = [
+        #     {col: normalize_number(val) for col, val in zip(columns, row)}
+        #     for row in db.cursor.fetchmany(1000)
+        # ]
+
+        records = []
+
+        rows = db.cursor.fetchmany(1000)
+
+        if not rows:
+            break
+
+        for row in rows:
+            row_dict = {}
+            for col, val in zip(columns, row):
+                # if isinstance(val, (bytes, bytearray)):
+                #     row[col] = str(base64.b64encode(val), 'utf-8')
+                # else:
+                # row[col] = normalize_number(val)
+                val = normalize_number(val)
+                row_dict[col] = val
+            records.append(row_dict)
 
         # stop loop if no rows
         if not records:
@@ -527,11 +589,8 @@ def create_data_in_frappe(doctype, table_name, pk_condition, records):
             if field_name != "erpnext_is_sync":
                 fields.append(field_name)
 
-        # frappe.log_error(title="Records for Bulk Insert", message=str(records))
-        # frappe.log_error(title="Fields for Bulk Insert", message=str(fields))
-        # demo = []
+
         for record in records:
-            # demo_dict = {}
             values = (
                 make_autoname("hash", doctype),
                 now(),
@@ -543,17 +602,12 @@ def create_data_in_frappe(doctype, table_name, pk_condition, records):
             for key, value in record.items():
                 if not isinstance(value, (bytes, bytearray)) and key != "erpnext_is_sync":
                     values = values + (value,)
-                    # demo_dict[key] = value
                 elif isinstance(value, (bytes, bytearray)):
                     value = str(base64.b64encode(value), 'utf-8')
                     values = values + (value,)
             insert_data.append(values)
-            # demo.append(demo_dict)
 
-        # frappe.log_error(title="Insert Data for Bulk Insert", message=str(insert_data))
-        # frappe.log_error(title="Demo Data for Bulk Insert", message=str(demo))
-
-        frappe.db.bulk_insert(doctype, fields=fields, values=set(insert_data))
+        frappe.db.bulk_insert(doctype, fields=fields, values=insert_data)
         frappe.db.commit()
                     
 

@@ -166,7 +166,7 @@ def get_data(filters):
         i.BUDAT, 
         i.BELNR;
     """
-    frappe.errprint(query)
+    # frappe.errprint(query)
 
     data = frappe.db.sql(query, values, as_dict=True)
     balance = 0
