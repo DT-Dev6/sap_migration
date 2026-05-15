@@ -28,6 +28,11 @@ frappe.ui.form.on("SAP Integration", {
                 frappe.msgprint("Data Tables Comparison Initiated Successfully!")
             )
         );
+        frm.add_custom_button(__("Lock Migrated Tables"), () =>
+            frm.call("lock_migrated_tables").then(() =>
+                frappe.msgprint("Migrated Tables Locked Successfully!")
+            )
+        );
         
     },
 });

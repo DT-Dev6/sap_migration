@@ -103,13 +103,22 @@ class SAPIntegration(Document):
             timeout=600000
         )
 
+    @frappe.whitelist()
+    def lock_migrated_tables(self):
+        frappe.enqueue(
+            lock_migrated_tables,   # 👈 function reference, not string
+            queue="long",
+            timeout=600000
+        )
+
 
 def compare_data():
     migrated_tables = frappe.db.get_all("Database Table Migration Log",
         filters={
             "table_created": 1,
             "data_migrated": 1,
-            "completed": 0
+            "completed": 0,
+            "locked": 0
         },
         fields=["table_name", "doctype_name"]
     )
@@ -149,7 +158,9 @@ def mysql_error_tables():
     db = MSSQL()
     error_tables = frappe.db.get_all("Database Table Migration Log",
         filters={
-            "table_created": 0
+            "table_created": 0,
+            "data_migrated": 0,
+            "locked": 0
         },
         fields=["table_name", "doctype_name"]
     )
@@ -170,7 +181,9 @@ def msql_error_table_migration():
     db = MSSQL()
     error_tables = frappe.db.get_all("Database Table Migration Log",
         filters={
-            "table_created": 0
+            "table_created": 0,
+            "data_migrated": 0,
+            "locked": 0
         },
         fields=["table_name", "doctype_name"]
     )
@@ -205,7 +218,8 @@ def msql_error_data_table_migration(page_length=5000):
         filters={
             "table_created": 1,
             "in_progress": 0,
-            "data_migrated": 0
+            "data_migrated": 0,
+            "locked": 0
         },
         start=0,
         page_length=page_length,
@@ -684,3 +698,34 @@ def create_data_in_frappe(doctype, table_name, pk_condition, records):
 #         SET erpnext_is_sync = {flag}
 #         WHERE {pk_condition};"""
 #     db.execute(mssql_query.format(**cond_values))
+
+
+
+def lock_migrated_tables():
+    migrated_tables = frappe.db.get_all("Database Table Migration Log",
+        filters={
+            "table_created": 1,
+            "data_migrated": 1,
+            "locked": 0
+        },
+        fields=["table_name", "doctype_name"]
+    )
+    for table in migrated_tables:
+        frappe.enqueue(
+            lock_table,
+            doctype_name=table.get("doctype_name"),
+            table_name=table.get("table_name"),
+            queue="long",
+            timeout=600000
+        )
+
+def lock_table(doctype_name, table_name):
+    doc = frappe.get_doc("Doctype", doctype_name)
+    for field in doc.fields:
+        if field.fieldname not in ("name", "owner", "creation", "modified", "modified_by") and field.fieldtype not in ("Column Break", "Section Break", "Tab Break") and not field.read_only:
+            field.read_only = 1
+    doc.in_create = 1
+    doc.allow_rename = 0
+    doc.save(ignore_permissions=True)
+    frappe.db.set_value("Database Table Migration Log", doctype_name, "locked", 1, update_modified=True)
+    frappe.db.commit()
