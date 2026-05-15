@@ -720,7 +720,7 @@ def lock_migrated_tables():
         )
 
 def lock_table(doctype_name, table_name):
-    doc = frappe.get_doc("Doctype", doctype_name)
+    doc = frappe.get_doc("DocType", doctype_name)
     for field in doc.fields:
         if field.fieldname not in ("name", "owner", "creation", "modified", "modified_by") and field.fieldtype not in ("Column Break", "Section Break", "Tab Break") and not field.read_only:
             field.read_only = 1
