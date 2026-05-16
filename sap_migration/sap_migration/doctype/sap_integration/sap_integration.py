@@ -720,12 +720,31 @@ def lock_migrated_tables():
         )
 
 def lock_table(doctype_name, table_name):
-    doc = frappe.get_doc("DocType", doctype_name)
-    for field in doc.fields:
-        if field.fieldname not in ("name", "owner", "creation", "modified", "modified_by") and field.fieldtype not in ("Column Break", "Section Break", "Tab Break") and not field.read_only:
-            field.read_only = 1
-    doc.in_create = 1
-    doc.allow_rename = 0
-    doc.save(ignore_permissions=True)
+    # doc = frappe.get_doc("DocType", doctype_name)
+    # for field in doc.fields:
+    #     if field.fieldname not in ("name", "owner", "creation", "modified", "modified_by") and field.fieldtype not in ("Column Break", "Section Break", "Tab Break") and not field.read_only:
+    #         field.read_only = 1
+    # doc.in_create = 1
+    # doc.allow_rename = 0
+    # doc.save(ignore_permissions=True)
+    frappe.db.sql("""
+        UPDATE `tabDocField`
+        SET read_only = 1
+        WHERE parent = %s
+            and fieldtype NOT IN ('Column Break', 'Section Break', 'Tab Break')
+    """, doctype_name)
+
+    frappe.db.sql("""
+        UPDATE `tabDocType`
+        SET in_create = 1, allow_rename = 0
+        WHERE name = %s
+    """, doctype_name)
+
+    frappe.db.sql("""
+        UPDATE `tabDocPerm`
+        SET read = 1, write = 0, create = 0, delete = 0, submit = 0, cancel = 0, amend = 0
+        WHERE parent = %s
+    """, doctype_name)
+
     frappe.db.set_value("Database Table Migration Log", doctype_name, "locked", 1, update_modified=True)
     frappe.db.commit()
