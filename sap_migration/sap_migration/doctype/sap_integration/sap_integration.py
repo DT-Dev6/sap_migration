@@ -742,7 +742,7 @@ def lock_table(doctype_name, table_name):
 
     frappe.db.sql("""
         UPDATE `tabDocPerm`
-        SET read = 1, write = 0, create = 0, delete = 0, submit = 0, cancel = 0, amend = 0
+        SET `read` = 1, `write` = 0, `create` = 0, `delete` = 0, `submit` = 0, `cancel` = 0, `amend` = 0
         WHERE parent = %s
     """, doctype_name)
 
