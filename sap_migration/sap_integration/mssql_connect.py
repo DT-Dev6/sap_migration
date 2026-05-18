@@ -12,20 +12,19 @@ DATABASE = 'MPR'
 USERNAME = 'sap'
 PASSWORD = 'Qwedsa@123'
 
-# --- Optimized Connection String ---
-CONN_STR = (
-    'DRIVER={ODBC Driver 17 for SQL Server};'
-    f'SERVER={SERVER};DATABASE={DATABASE};'
-    f'UID={USERNAME};PWD={PASSWORD};'
-    'TrustServerCertificate=yes;'
-    # 'Connection Timeout=3;'
-)
-
 
 class MSSQL:
     def __init__(self):
         import pyodbc
         # try:
+        # --- Optimized Connection String ---
+        CONN_STR = (
+            'DRIVER={ODBC Driver 17 for SQL Server};'
+            f'SERVER={SERVER};DATABASE={DATABASE};'
+            f'UID={USERNAME};PWD={PASSWORD};'
+            'TrustServerCertificate=yes;'
+            # 'Connection Timeout=3;'
+        )
         self.conn = pyodbc.connect(CONN_STR, autocommit=True)
         self.cursor = self.conn.cursor()
         # except Exception as e:

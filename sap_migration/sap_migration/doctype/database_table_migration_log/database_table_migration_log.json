@@ -17,6 +17,7 @@
   "mariadb_count",
   "completed",
   "locked",
+  "english_description_updated",
   "remark"
  ],
  "fields": [
@@ -31,7 +32,8 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Table Name",
-   "read_only": 1
+   "read_only": 1,
+   "search_index": 1
   },
   {
    "default": "0",
@@ -104,12 +106,21 @@
    "label": "Locked",
    "read_only": 1,
    "search_index": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "english_description_updated",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "English Description Updated",
+   "read_only": 1,
+   "search_index": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-05-15 11:21:18.800122",
+ "modified": "2026-05-17 15:26:37.270412",
  "modified_by": "Administrator",
  "module": "SAP Migration",
  "name": "Database Table Migration Log",
@@ -132,5 +143,6 @@
  "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
- "states": []
+ "states": [],
+ "track_changes": 1
 }

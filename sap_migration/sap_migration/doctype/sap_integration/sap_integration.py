@@ -7,6 +7,7 @@ from frappe.model.document import Document
 # from sap_migration.sap_integration.mssql_connect import MSSQL
 from frappe.utils import cint, now
 from frappe.model.naming import make_autoname
+import itertools
 
 MSSQL_TO_FRAPPE_TYPES = {
     "bit": "Check",
@@ -107,6 +108,15 @@ class SAPIntegration(Document):
     def lock_migrated_tables(self):
         frappe.enqueue(
             lock_migrated_tables,   # 👈 function reference, not string
+            queue="long",
+            timeout=600000
+        )
+
+    @frappe.whitelist()
+    def update_english_description(self):
+        # update_english_description()   # 👈 function reference, not string
+        frappe.enqueue(
+            update_english_description,
             queue="long",
             timeout=600000
         )
@@ -736,7 +746,7 @@ def lock_table(doctype_name, table_name):
 
     frappe.db.sql("""
         UPDATE `tabDocType`
-        SET in_create = 1, allow_rename = 0
+        SET in_create = 1, allow_rename = 0, track_changes = 1
         WHERE name = %s
     """, doctype_name)
 
@@ -748,3 +758,48 @@ def lock_table(doctype_name, table_name):
 
     frappe.db.set_value("Database Table Migration Log", doctype_name, "locked", 1, update_modified=True)
     frappe.db.commit()
+
+def update_english_description():
+    trans_tables = frappe.db.sql("""
+        SELECT dd.fieldname, dd.ddtext,
+            dd.tabname, log.doctype_name
+        FROM `tabmpr-DD03T` dd
+        left join `tabDatabase Table Migration Log` log
+            on log.table_name = dd.tabname
+        where dd.ddtext is not null 
+            AND dd.ddtext != ""
+            AND dd.ddlanguage = 'E'
+            AND log.english_description_updated = 0
+            AND log.completed = 1
+        order by dd.tabname; """, as_dict=1)
+
+    for k, v in itertools.groupby(trans_tables, key=lambda t: t.tabname):
+        # update_tables_desc(doctype, list(v))
+        frappe.enqueue(
+            update_tables_desc,
+            table_name=k,
+            descriptions=list(v),
+            queue="long",
+            timeout=600000
+        )
+
+def update_tables_desc(table_name, descriptions):
+    # doctype = frappe.db.get_value("Database Table Migration Log", {"table_name": table_name, "english_description_updated": 0}, "doctype_name")
+
+    doctype = descriptions[0].get("doctype_name")
+    if doctype:
+        for i in descriptions:
+            frappe.db.sql("""
+                UPDATE `tabDocField`
+                SET description = %s
+                WHERE parent = %s
+                    AND fieldname = %s
+            """, (i.ddtext, i.doctype_name, i.fieldname))
+        
+        frappe.db.commit()
+        frappe.db.set_value("Database Table Migration Log", doctype, "english_description_updated", 1, update_modified=True)
+        frappe.db.commit()
+    else:
+        frappe.throw(f"No Doctype found for table {table_name} to update English descriptions")
+
+
