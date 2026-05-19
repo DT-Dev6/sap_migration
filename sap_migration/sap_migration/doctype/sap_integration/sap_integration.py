@@ -774,14 +774,14 @@ def update_english_description():
         order by dd.tabname; """, as_dict=1)
 
     for k, v in itertools.groupby(trans_tables, key=lambda t: t.tabname):
-        # update_tables_desc(doctype, list(v))
-        frappe.enqueue(
-            update_tables_desc,
-            table_name=k,
-            descriptions=list(v),
-            queue="long",
-            timeout=600000
-        )
+        update_tables_desc(k, list(v))
+        # frappe.enqueue(
+        #     update_tables_desc,
+        #     table_name=k,
+        #     descriptions=list(v),
+        #     queue="long",
+        #     timeout=600000
+        # )
 
 def update_tables_desc(table_name, descriptions):
     # doctype = frappe.db.get_value("Database Table Migration Log", {"table_name": table_name, "english_description_updated": 0}, "doctype_name")
